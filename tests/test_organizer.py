@@ -141,15 +141,24 @@ class OrganizerTests(unittest.TestCase):
         self.assertFalse((self.root / 'Audio').exists())
 
     def test_size_boundaries(self):
-        for name, size, expected in [('small', 1024**2 - 1, 'Small'),
-                                     ('medium', 1024**2, 'Medium'),
-                                     ('large', 100 * 1024**2, 'Large')]:
+        for name, size, expected in [('small.bin', 1024**2 - 1, 'Small'),
+                                     ('medium.bin', 1024**2, 'Medium'),
+                                     ('large.bin', 100 * 1024**2, 'Large')]:
             path = self.root / name
             with path.open('wb') as stream:
                 stream.truncate(size)
         plan = organize_by_size(self.root, dry_run=True)
         self.assertEqual({src.name: dst.parent.name for src, dst in plan},
-                         {'small': 'Small', 'medium': 'Medium', 'large': 'Large'})
+                         {'small.bin': 'Small', 'medium.bin': 'Medium', 'large.bin': 'Large'})
+
+    def test_size_bucket_blocked_by_file_preserves_all_sources(self):
+        source = self.write('sample.bin', b'source')
+        occupied = self.write('Small', b'existing bucket-name file')
+        for dry_run in (True, False):
+            with self.assertRaises(ValueError):
+                organize_by_size(self.root, dry_run=dry_run)
+        self.assertEqual(source.read_bytes(), b'source')
+        self.assertEqual(occupied.read_bytes(), b'existing bucket-name file')
 
     def test_exclusive_move_preserves_existing_destination(self):
         source = self.write('source.txt', b'source')
