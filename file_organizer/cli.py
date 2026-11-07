@@ -1,7 +1,7 @@
 """
 Command-line interface for Smart File Organizer.
 """
-import sys
+import os
 from pathlib import Path
 
 import click
@@ -46,12 +46,11 @@ def main(path: Path, organization_method: str, dry_run: bool, recursive: bool, v
 
     click.echo("")
 
-    if organization_method == "type":
-        moves = organize_by_type(path, dry_run=dry_run, recursive=recursive)
-    elif organization_method == "date":
-        moves = organize_by_date(path, dry_run=dry_run, recursive=recursive)
-    else:
-        moves = organize_by_size(path, dry_run=dry_run, recursive=recursive)
+    methods = {"type": organize_by_type, "date": organize_by_date, "size": organize_by_size}
+    try:
+        moves = methods[organization_method](path, dry_run=dry_run, recursive=recursive)
+    except (OSError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
 
     if not moves:
         click.echo("✅ No files to organize.")
@@ -60,7 +59,7 @@ def main(path: Path, organization_method: str, dry_run: bool, recursive: bool, v
     click.echo(f"Found {len(moves)} files to organize:\n")
 
     for src, dst in moves:
-        rel_dst = dst.relative_to(path)
+        rel_dst = dst.relative_to(Path(os.path.abspath(path)))
         if verbose:
             click.echo(f"  {src.name}  →  {rel_dst}")
         else:

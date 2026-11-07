@@ -8,7 +8,7 @@ version = "1.0.0"
 authors = [
     { name = "Xu Jiaqi", email = "jiaqixu12138@gmail.com" }
 ]
-description = "A powerful command-line tool to automatically organize messy folders by type, date, or custom rules."
+description = "A powerful command-line tool to automatically organize messy folders by type, modification date, or size."
 readme = "README.md"
 license = { file = "LICENSE" }
 classifiers = [
