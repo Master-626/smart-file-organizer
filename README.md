@@ -1,5 +1,9 @@
 # Smart File Organizer
 
+## 中文简介
+
+这是一个小型 Python 命令行工具，用来把杂乱文件夹里的文件按**类型**、**修改日期**或**大小**移动到子文件夹。请先用 `--dry-run` 预览。移动不是事务：中途失败时，已经完成的移动会保留。加上 `--manifest` 会把实际移动写成清单，之后可以用 `--undo` 移回原处。需要 Python 3.8 或更新版本。
+
 A small Python command-line tool that moves files into folders by extension,
 modification date, or size. Preview the moves before applying them.
 
@@ -23,8 +27,8 @@ organize ~/Downloads --by type --dry-run --verbose
 organize ~/Downloads --by type
 ```
 
-Use a disposable folder or a backup for your first run. Moves are **not undoable**
-through this tool, and no persistent move log is saved.
+Use a disposable folder or a backup for your first run. Without `--manifest`,
+moves are not undoable through this tool.
 
 ```bash
 organize ~/Downloads --by date --dry-run
@@ -32,20 +36,34 @@ organize ~/Downloads --by size --dry-run
 organize ~/Downloads --by type --recursive --dry-run --verbose
 ```
 
+Record an applied run, then move those files back. Put the manifest **outside**
+the folder you are organizing:
+
+```bash
+organize ~/Downloads --by type --manifest ~/downloads-moves.jsonl
+organize --undo ~/downloads-moves.jsonl --dry-run
+organize --undo ~/downloads-moves.jsonl
+```
+
 ## Options
 
 ```text
 organize PATH [OPTIONS]
+organize --undo MANIFEST [--dry-run] [--verbose]
 
 --by [type|date|size]  Organization method (default: type)
 --dry-run             Preview without creating folders or moving files
 --recursive           Include files in visible subdirectories
 -v, --verbose         Show full destination paths relative to PATH
+--manifest FILE       Write each applied move as JSON Lines for --undo
+--undo FILE           Move files back using a manifest from --manifest
 --version             Show the version
 --help                Show help
 ```
 
-`--config`, `--undo`, and week-based grouping are not implemented.
+`--undo` does not take a target directory, `--manifest`, `--recursive`, or `--by`.
+It accepts `--dry-run` and `--verbose`. `--config` and week-based grouping are
+not implemented.
 
 ## Organization rules
 
@@ -81,10 +99,19 @@ methods or custom categories can move previously organized files again.
   alternate data streams may not be preserved. Back up important data first.
 - A run is **not transactional**. On a permission error, full disk, or interruption,
   earlier moves remain applied; interruption can leave a partial destination or
-  duplicate copies. Inspect both locations before retrying.
+  duplicate copies. Inspect both locations before retrying. `--manifest` appends
+  each move as it succeeds, so a partial manifest can be undone.
+- A collision suffix that would exceed the filesystem's file-name limit raises
+  `ValueError` during planning. Dry runs and real runs both stop before moving
+  any file. `os.path.lexists` alone is not enough: it returns false for an
+  over-long name, which used to let a preview succeed and then fail mid-run.
+- If a date folder is blocked by a file or a symlink (for example a file named
+  `2020` when another file belongs in `2020/01`), planning raises `ValueError`
+  before any move. The message names the blocking path.
 - Use only on folders you control, with no concurrent writers or other organizer
   runs. Path checks do not protect against an adversary replacing directories or
-  files between validation and use. This is not a security sandbox.
+  files between validation and use. This is not a security sandbox. Do not point
+  `--undo` at a manifest you do not trust.
 
 Older code used size folders named `Small (<1MB)`, `Medium (1MB-100MB)`, and
 `Large (>100MB)`. Those names are invalid on Windows. This version uses the portable
@@ -113,17 +140,38 @@ use `Others`. Returned paths are absolute. Invalid categories or destinations ra
 `ValueError`; filesystem failures raise `OSError`. The CLI reports these errors and
 exits unsuccessfully.
 
+## Undo manifest
+
+`--manifest` cannot be combined with `--dry-run`. Each line is one JSON object,
+`{"v": 1, "src": "<absolute original>", "dst": "<absolute new path>"}`.
+The file is created only after planning succeeds, outside the target directory,
+and is not overwritten. `--undo` reads that file, checks every record, then moves
+destinations back in reverse order without replacing existing files. The manifest
+is left in place. A manifest is trusted input: it can name any regular file the
+user is allowed to move, but symlink destinations and occupied original paths are
+rejected.
+
+```python
+from pathlib import Path
+from file_organizer.organizer import organize_by_type, undo_manifest
+
+organize_by_type(Path("Downloads"), manifest=Path("/tmp/downloads-moves.jsonl"))
+undo_manifest(Path("/tmp/downloads-moves.jsonl"), dry_run=True)
+```
+
 ## Development
 
 ```bash
-python -m pip install .
-python -m unittest discover -s tests -v
+python -m pip install -e ".[dev]"
+python -m pytest
+python -m ruff check .
 ```
 
-Tests use temporary folders and Python's standard library `unittest`. CI is
-configured for Python 3.8 on Linux and 3.12, 3.13, and 3.14 on Linux, Windows,
-and macOS; symlink
-tests skip if the operating system does not permit creating links.
+`pytest` runs the `unittest` suite in `tests/test_organizer.py` and the cases in
+`tests/test_core.py`. CI lints with Ruff, then runs pytest on Python 3.8 on Linux
+and on 3.9–3.14 (3.12+ also on Windows and macOS). Symlink tests skip if the
+operating system does not permit creating links. The filename-limit tests skip
+when the filesystem cannot create a name of that length.
 
 Contributions with reproducible bug reports and regression tests are welcome.
 

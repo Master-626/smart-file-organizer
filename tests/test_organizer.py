@@ -2,16 +2,21 @@ import os
 import shutil
 import stat
 import tempfile
-import unittest
 import unicodedata
+import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from click.testing import CliRunner
+
 from file_organizer.cli import main
 from file_organizer.organizer import (
-    get_category, organize_by_type, organize_by_date, organize_by_size,
-    _move_without_overwrite, _is_link,
+    _is_link,
+    _move_without_overwrite,
+    get_category,
+    organize_by_date,
+    organize_by_size,
+    organize_by_type,
 )
 
 
@@ -227,19 +232,24 @@ class OrganizerTests(unittest.TestCase):
 
     def test_cli_relative_path_and_errors(self):
         runner = CliRunner()
-        with runner.isolated_filesystem():
-            Path('sample.txt').write_text('hello')
-            result = runner.invoke(main, ['.', '--dry-run', '--verbose'])
-            self.assertEqual(result.exit_code, 0, result.output)
-            self.assertIn('Documents/sample.txt', result.output.replace('\\', '/'))
-            self.assertTrue(Path('sample.txt').exists())
-            Path('nested').mkdir()
-            result = runner.invoke(main, ['nested/..', '--dry-run', '--verbose'])
-            self.assertEqual(result.exit_code, 0, result.output)
-            Path('Documents').write_text('blocked')
-            result = runner.invoke(main, ['.'])
-            self.assertEqual(result.exit_code, 1)
-            self.assertIn('Error:', result.output)
+        previous = os.getcwd()
+        with tempfile.TemporaryDirectory() as directory:
+            os.chdir(directory)
+            try:
+                Path('sample.txt').write_text('hello')
+                result = runner.invoke(main, ['.', '--dry-run', '--verbose'])
+                self.assertEqual(result.exit_code, 0, result.output)
+                self.assertIn('Documents/sample.txt', result.output.replace('\\', '/'))
+                self.assertTrue(Path('sample.txt').exists())
+                Path('nested').mkdir()
+                result = runner.invoke(main, ['nested/..', '--dry-run', '--verbose'])
+                self.assertEqual(result.exit_code, 0, result.output)
+                Path('Documents').write_text('blocked')
+                result = runner.invoke(main, ['.'])
+                self.assertEqual(result.exit_code, 1)
+                self.assertIn('Error:', result.output)
+            finally:
+                os.chdir(previous)
         self.assertIn('--dry-run', runner.invoke(main, ['--help']).output)
         self.assertEqual(runner.invoke(main, ['--version']).exit_code, 0)
 
