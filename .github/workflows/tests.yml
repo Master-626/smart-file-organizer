@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-15-intel]
         python: ["3.12", "3.13", "3.14"]
         include:
           # ubuntu-latest is 26.04, which has no setup-python builds for 3.8 or 3.9.

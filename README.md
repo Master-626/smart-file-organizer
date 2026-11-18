@@ -170,7 +170,7 @@ python -m ruff check .
 `pytest` runs the `unittest` suite in `tests/test_organizer.py` and the cases in
 `tests/test_core.py`. CI lints with Ruff, then runs pytest on Python 3.8 and 3.9
 on Ubuntu 22.04, on 3.10–3.14 on the current Ubuntu runner, and on 3.12+ on
-Windows and macOS. Symlink tests skip if the operating system does not permit
+Windows and macOS 15 Intel. Symlink tests skip if the operating system does not permit
 creating links. The filename-limit tests skip when the filesystem cannot create
 a name of that length.
 
